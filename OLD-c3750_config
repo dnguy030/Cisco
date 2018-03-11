@@ -1,0 +1,49 @@
+hostname SW-0
+
+ip routing
+sdm prefer dual routing
+ipv6 unicast-routing
+ipv6 cef
+spanning-tree mode rapid-pvst
+vtp mode transparent
+
+no udld enable
+no ip finger
+no service finger
+no snmp-server
+no service pad
+no service config
+no service tcp-small-servers
+no service udp-small-servers
+no cdp run
+no lldp run
+no ip http server
+no ip http secure-server
+service password-encryption
+
+vlan 10
+name Production_Network
+exit
+
+vlan 20
+name iSCSI_SAN
+exit
+
+
+int vlan 20
+ip address 192.168.20.1 255.255.255.0
+no shut
+
+ip dhcp pool dhcp_pool_VLAN-20
+network 192.168.20.0 255.255.255.0
+default-router 192.168.20.1
+exit
+
+ip access-list standard RestrictVty
+remark Restricts VTY Access
+permit 192.168.10.0 0.0.0.255
+deny any log
+exit
+
+ip route 0.0.0.0 0.0.0.0 192.168.10.1
+ip name-server 8.8.8.8 8.8.4.4
