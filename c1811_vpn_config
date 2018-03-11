@@ -1,0 +1,215 @@
+show start
+Using 4125 out of 196600 bytes
+!
+! Last configuration change at 20:25:01 PST Sun Dec 13 2015 by Admin
+! NVRAM config last updated at 20:25:24 PST Sun Dec 13 2015 by Admin
+!
+version 12.4
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+!
+hostname Phuong
+!
+boot-start-marker
+boot system flash c181x-advipservicesk9-mz.124-24.T8.bin
+boot-end-marker
+!
+logging message-counter syslog
+enable secret 5 !!!REDACTED!!!
+!
+aaa new-model
+!
+!
+aaa authentication login default local
+aaa authentication login vpn-xauth local
+aaa authorization network vpn-group local 
+!
+!
+aaa session-id common
+clock timezone PST -8
+clock summer-time PDT recurring
+!
+!
+dot11 syslog
+no ip source-route
+!
+!
+!
+!
+ip cef
+no ip bootp server
+ip domain name c1811.local
+ip name-server 8.8.8.8
+ip name-server 8.8.4.4
+no ipv6 cef
+!
+multilink bundle-name authenticated
+!
+password encryption aes
+!
+!
+memory reserve console 4096 
+object-group network OG_restricted-ips 
+ host 192.168.10.20
+ host 192.168.10.25
+ host 192.168.10.26
+ host 192.168.10.28
+ host 192.168.10.101
+!
+username user1 secret 5 !!!REDACTED!!!
+username admin secret 5 !!!REDACTED!!!
+! 
+!
+crypto isakmp policy 1
+ encr aes
+ authentication pre-share
+ group 2
+!
+crypto isakmp client configuration group Public-Internet-VPN
+ key 6 !!!REDACTED!!!
+ dns 8.8.8.8 8.8.4.4
+ pool vpn-pool
+ save-password
+ max-users 8
+crypto isakmp profile vpn-ike-profile
+   match identity group Public-Internet-VPN
+   client authentication list vpn-xauth
+   isakmp authorization list vpn-group
+   client configuration address respond
+   virtual-template 2
+!
+!
+crypto ipsec transform-set ESP-AES-SHA1 esp-aes esp-sha-hmac 
+!
+crypto ipsec profile vpn-profile
+ set transform-set ESP-AES-SHA1 
+ set isakmp-profile vpn-ike-profile
+!
+!
+archive
+ log config
+  hidekeys
+!
+!
+ip ssh version 2
+!
+!
+!
+interface FastEthernet0
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+!
+interface FastEthernet1
+ ip address 192.168.10.3 255.255.255.0
+ no ip redirects
+ no ip unreachables
+ no ip proxy-arp
+ ip nat outside
+ no ip virtual-reassembly
+ duplex auto
+ speed auto
+!
+interface FastEthernet2
+ shutdown
+!
+interface FastEthernet3
+ shutdown
+!
+interface FastEthernet4
+ shutdown
+!
+interface FastEthernet5
+ shutdown
+!
+interface FastEthernet6
+ shutdown
+!
+interface FastEthernet7
+ shutdown
+!
+interface FastEthernet8
+ shutdown
+!
+interface FastEthernet9
+ shutdown
+!
+interface Virtual-Template2 type tunnel
+ ip unnumbered FastEthernet1
+ ip access-group ACL_restrict-vpn-traffic in
+ ip nat inside
+ no ip virtual-reassembly
+ tunnel mode ipsec ipv4
+ tunnel protection ipsec profile vpn-profile
+!
+interface Vlan1
+ no ip address
+!
+interface Async1
+ no ip address
+ encapsulation slip
+!
+ip local pool vpn-pool 192.168.100.80 192.168.100.87
+ip forward-protocol nd
+ip route 0.0.0.0 0.0.0.0 192.168.10.1
+no ip http server
+no ip http secure-server
+!
+!
+ip nat inside source static 192.168.100.80 192.168.10.80
+ip nat inside source static 192.168.100.81 192.168.10.81
+ip nat inside source static 192.168.100.82 192.168.10.82
+ip nat inside source static 192.168.100.83 192.168.10.83
+ip nat inside source static 192.168.100.84 192.168.10.84
+ip nat inside source static 192.168.100.85 192.168.10.85
+ip nat inside source static 192.168.100.86 192.168.10.86
+ip nat inside source static 192.168.100.87 192.168.10.87
+!
+ip access-list standard acl_ssh-in
+ permit 192.168.10.0 0.0.0.255
+!
+ip access-list extended ACL_restrict-vpn-traffic
+ deny   ip any object-group OG_restricted-ips
+ permit tcp any any
+ permit udp any any
+ deny   ip any any
+!
+no cdp run
+
+!
+!
+!
+!
+!
+!
+control-plane
+!
+!
+line con 0
+ logging synchronous
+line 1
+ modem InOut
+ stopbits 1
+ speed 115200
+ flowcontrol hardware
+line aux 0
+ exec-timeout 0 1
+ no exec
+ transport output none
+line vty 0 4
+ session-timeout 5 
+ access-class acl_ssh-in in
+ transport input ssh
+line vty 5 7
+ session-timeout 5 
+ access-class acl_ssh-in in
+ transport input ssh
+!
+ntp server 1.us.pool.ntp.org
+ntp server 2.us.pool.ntp.org
+ntp server time.nist.gov
+ntp server 3.us.pool.ntp.org
+ntp server 0.us.pool.ntp.org   
