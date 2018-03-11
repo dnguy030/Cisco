@@ -1,0 +1,154 @@
+hostname Stargate-1
+
+line console 0
+logging synchronous
+exit
+
+! Enable/Disable unnecessary services
+no service pad
+no ipv6 cef
+no ip bootp server
+no ip source-route
+no ip http secure-server
+no cdp run
+no service config
+service password-encryption
+no crypto ikev2 http-url cert
+no ip http server
+no ip http secure-server
+
+! Enable SSH version 2
+ip ssh version 2
+
+! Hardcode DNS servers
+ip name-server 8.8.8.8 8.8.4.4
+
+! Hardcode the default route
+ip route 0.0.0.0 0.0.0.0 192.168.1.1
+
+! Configure interface gi0/0
+interface gi0/0
+ip address 192.168.1.3 255.255.255.0
+ip nat outside
+duplex auto
+speed auto
+exit
+
+! Set the time
+clock timezone PST -8
+clock summer-time PDT recurring
+ntp server time.nist.gov
+ntp server 0.us.pool.ntp.org
+ntp server 1.us.pool.ntp.org
+ntp server 2.us.pool.ntp.org
+
+! VPN address pool
+ip local pool vpn-pool 192.168.100.80 192.168.100.94
+
+! Static NAT for the VPN pool IP addresses
+ip nat inside source static 192.168.100.80 192.168.1.80
+ip nat inside source static 192.168.100.81 192.168.1.81
+ip nat inside source static 192.168.100.82 192.168.1.82
+ip nat inside source static 192.168.100.83 192.168.1.83
+ip nat inside source static 192.168.100.84 192.168.1.84
+ip nat inside source static 192.168.100.85 192.168.1.85
+ip nat inside source static 192.168.100.86 192.168.1.86
+ip nat inside source static 192.168.100.87 192.168.1.87
+ip nat inside source static 192.168.100.88 192.168.1.88
+ip nat inside source static 192.168.100.89 192.168.1.89
+ip nat inside source static 192.168.100.90 192.168.1.90
+ip nat inside source static 192.168.100.91 192.168.1.91
+ip nat inside source static 192.168.100.92 192.168.1.92
+ip nat inside source static 192.168.100.93 192.168.1.93
+ip nat inside source static 192.168.100.94 192.168.1.94
+
+! Configure for EAP-MSCHAPv2 authentication
+aaa new-model
+aaa authentication login eap-list group radius
+aaa authentication login ikev2-local local
+aaa authorization network eap-list group radius
+aaa authorization network ikev2-local local
+
+! Configure the RADIUS server
+radius server pfsense
+address ipv4 192.168.1.30 auth-port 1812
+key !!!REDACTED!!!
+exit
+
+aaa group server radius radius-list
+server name pfsense
+exit
+
+
+! Configure the IKEv2 authorization policy
+crypto ikev2 authorization policy ikev2-author-policy 
+pool vpn-pool
+dns 8.8.8.8 8.8.4.4
+netmask 255.255.255.0
+exit
+
+! Configure the IKEv2 Proposal
+crypto ikev2 proposal ikev2-proposal-windows-compatible 
+encryption aes-cbc-256 aes-cbc-128
+integrity sha384 sha256 sha1
+group 2
+exit
+
+crypto ikev2 proposal ikev2-proposal-secure 
+encryption aes-gcm-256 aes-gcm-128
+prf sha512 sha384 sha256
+group 21 20 19 24 14
+exit
+
+! Configure the IKEv2 Policy
+crypto ikev2 policy ikev2-policy 
+match fvrf any
+proposal ikev2-proposal-windows-compatible
+ikev2-proposal-secure
+exit
+
+! Import the pfx file
+crypto pki trustpoint !!!REDACTED!!!
+exit
+crypto pki import !!!REDACTED!!! pkcs12 flash0:!!!REDACTED!!!.pfx !!!REDACTED!!!
+
+
+! Configure the IKEv2 Profile
+crypto ikev2 profile ikev2-profile
+match identity remote any
+authentication local rsa-sig
+authentication remote eap query-identity
+pki trustpoint !!!REDACTED!!!
+dpd 60 2 on-demand
+aaa authentication eap eap-list
+aaa authorization group eap list ikev2-local ikev2-author-policy
+aaa authorization user eap cached
+virtual-template 1
+reconnect timeout 900
+exit
+
+! Configure the transform sets
+crypto ipsec transform-set transform-general esp-aes esp-sha-hmac
+mode tunnel
+exit
+
+crypto ipsec transform-set transform-secure esp-gcm
+mode tunnel
+exit
+
+crypto ipsec transform-set transform-paranoid esp-gcm 256
+mode tunnel
+exit
+
+! Configure the IPSec Profile
+crypto ipsec profile ipsec-profile
+set transform-set transform-general transform-secure transform-paranoid
+set ikev2-profile ikev2-profile
+exit
+
+interface Virtual-Template1 type tunnel
+ip unnumbered GigabitEthernet0/0
+ip nat inside
+tunnel mode ipsec ipv4
+tunnel protection ipsec profile ipsec-profile
+exit
