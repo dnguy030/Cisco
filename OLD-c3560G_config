@@ -1,0 +1,96 @@
+no service pad
+no ip finger
+no service finger
+no snmp-server
+no service config
+no service tcp-small-servers
+no service udp-small-servers
+no cdp run
+no lldp run
+no ip http server
+no ip http secure-server
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+spanning-tree mode rapid-pvst
+system mtu routing 1500
+ip name-server 8.8.8.8
+ip name-server 8.8.4.4
+ip domain-lookup
+no aaa new-model
+vtp mode off
+
+ip domain-name C3560G.local
+ip ssh version 2
+
+clock timezone PST -8
+clock summer-time PDT recurring
+ntp server time.nist.gov
+ntp server 0.us.pool.ntp.org
+ntp server 1.us.pool.ntp.org
+ntp server 2.us.pool.ntp.org
+ntp server 3.us.pool.ntp.org
+
+line con 0
+logging synchronous
+exit
+
+vlan 2
+name PARKING_VLAN
+exit
+
+vlan 10
+name Production_Network
+exit
+
+interface Vlan10
+description Production_Network
+ip address 192.168.10.2 255.255.255.0
+
+vlan 20
+name iSCSI_SAN
+exit
+
+interface Vlan20
+description iSCSI_SAN
+ip address 192.168.20.1 255.255.255.0
+exit
+
+interface Vlan1
+no ip address
+shutdown
+exit
+
+ip classless
+ip route 0.0.0.0 0.0.0.0 192.168.10.1
+
+line vty 0 4
+transport input none
+exit
+
+!Commands for INACTIVE switchports
+switchport mode access
+switchport access vlan 2
+description VLAN 2 | INACTIVE SWITCHPORT
+shutdown
+exit
+
+!Commands for VLAN 10 Production Network switchports
+switchport mode access
+switchport access vlan 10
+spanning-tree portfast
+description VLAN 10 | IP address or description
+no shutdown
+exit
+
+
+transport input ssh
+sesssion-timeout 5
+access-class acl_ssh-in in
+
+ip access-list standard acl_ssh-in
+permit 192.168.10.0 0.0.0.255
+
+
+aaa new-model
+aaa authentication login default local
