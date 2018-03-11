@@ -1,0 +1,10 @@
+crypto key generate rsa general-keys mod 4096 label ca-server
+
+crypto pki trustpoint ca-server
+enrollment selfsigned
+hash sha512
+revocation-check none
+rsakeypair ca-server
+eku request server-auth client-auth
+
+crypto pki enroll ca-server
