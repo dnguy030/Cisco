@@ -1,0 +1,160 @@
+hostname Stargate-1
+
+line console 0
+logging synchronous
+exit
+
+! Enable/Disable unnecessary services
+no service pad
+no ipv6 cef
+no ip bootp server
+no ip source-route
+no ip http secure-server
+no cdp run
+no service config
+service password-encryption
+
+! Enable SSH version 2
+ip ssh version 2
+
+! Hardcode DNS servers
+ip name-server 8.8.8.8 8.8.4.4
+
+! Set the time
+clock timezone PST -8
+clock summer-time PDT recurring
+ntp server time.nist.gov
+ntp server 0.us.pool.ntp.org
+ntp server 1.us.pool.ntp.org
+ntp server 2.us.pool.ntp.org
+
+
+
+! VPN address pool
+ip local pool vpn-pool 192.168.100.80 192.168.100.87
+
+! Static NAT for the VPN pool IP addresses
+ip nat inside source static 192.168.100.80 192.168.10.80
+ip nat inside source static 192.168.100.81 192.168.10.81
+ip nat inside source static 192.168.100.82 192.168.10.82
+ip nat inside source static 192.168.100.83 192.168.10.83
+ip nat inside source static 192.168.100.84 192.168.10.84
+ip nat inside source static 192.168.100.85 192.168.10.85
+ip nat inside source static 192.168.100.86 192.168.10.86
+ip nat inside source static 192.168.100.87 192.168.10.87
+
+
+! Configure for EAP-MSCHAPv2 authentication
+aaa new-model
+aaa authentication login eap-list group radius radius-list local
+aaa authentication login ikev2-local local
+aaa authorization network eap-list group radius radius-list local 
+aaa authorization network ikev2-local local
+
+radius server pfsense
+address ipv4 192.168.10.198 auth-port 1812
+key !!!REDACTED!!!
+exit
+
+aaa group server radius radius-list
+server name pfsense
+exit
+
+
+
+
+interface GigabitEthernet0/0
+ip nat outside
+exit
+
+crypto ikev2 authorization policy ikev2-author-policy 
+pool vpn-pool
+dns 8.8.8.8 8.8.4.4
+netmask 255.255.255.0
+exit
+
+no crypto ikev2 http-url cert
+
+crypto key gen rsa mod 2048 general-keys label ca-server
+
+crypto pki trustpoint ca-server
+revocation-check none
+rsakeypair ca-server
+exit
+
+crypto pki server ca-server
+database level names
+no database archive
+hash sha512
+lifetime certificate 3650
+lifetime ca-certificate 7305 23 59
+auto-rollover 365
+eku server-auth client-auth
+no shut
+exit
+
+crypto key gen rsa mod 2048 general-keys exportable label router
+
+crypto pki trustpoint router
+enrollment url http://192.168.10.132:80
+fqdn 192.168.10.132
+ip-address 192.168.10.132
+subject-name cn=192.168.10.132
+revocation-check none
+rsakeypair router
+auto-enroll regenerate
+hash sha256
+exit
+
+crypto pki enroll router
+exit
+crypto pki server ca-server grant 1
+conf t
+crypto pki export router pkcs12 flash0:router.p12 password !!!REDACTED!!!
+ 
+
+
+crypto ikev2 proposal proposal-windows10
+
+
+
+crypto ikev2 proposal ikev2-proposal 
+encryption aes-cbc-128
+integrity sha1
+group 2
+exit
+
+crypto ikev2 policy ikev2-policy 
+match fvrf any
+proposal ikev2-proposal
+exit
+
+
+crypto ikev2 profile ikev2-profile
+match identity remote any
+authentication remote eap query-identity
+authentication local rsa-sig
+pki trustpoint router
+dpd 60 2 on-demand
+aaa authentication eap eap-list
+aaa authorization group eap list ikev2-local ikev2-author-policy
+aaa authorization user eap cached
+virtual-template 1
+exit
+
+crypto ipsec transform-set transform1 esp-3des esp-sha-hmac 
+mode tunnel
+exit
+
+crypto ipsec profile ipsec-profile
+set transform-set transform1 
+set ikev2-profile ikev2-profile
+exit
+
+
+interface Virtual-Template1 type tunnel
+ip unnumbered GigabitEthernet0/0
+ip nat inside
+tunnel mode ipsec ipv4
+tunnel protection ipsec profile ipsec-profile
+exit
